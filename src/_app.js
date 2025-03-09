@@ -43,6 +43,7 @@ const serverInitializer = async () => {
 
             })
             .catch((error) => {
+                logger.info(error)
                 logger.error('Database connection error:', {
                     message: error.message,
                     stack: error.stack,
