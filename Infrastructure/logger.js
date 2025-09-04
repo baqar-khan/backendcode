@@ -1,19 +1,17 @@
-
-const pino = require('pino')
-const pretty = require('pino-pretty')
-const { AbstractLogger, QueryRunner } = require('typeorm');
+import pino from "pino";
+import pretty from "pino-pretty";
+import { AbstractLogger } from "typeorm";
 
 const stream = pretty({
-  colorize: true, // colorize output
+  colorize: true, // color output
   levelFirst: false, // log level comes first
-  // translateTime: 'SYS:standard', // translate timestamp to readable format
-})
-const logger = pino(stream)
+  // translateTime: 'SYS:standard',
+});
 
+const logger = pino(stream);
 
 class PinoLogger extends AbstractLogger {
   logQuery(query, parameters, queryRunner) {
-    // query = query.JSON
     logger.info(query);
   }
 
@@ -22,12 +20,8 @@ class PinoLogger extends AbstractLogger {
   }
 
   logQuerySlow(time, query, parameters, queryRunner) {
-    logger.warn(time, query, parameters , "Slow query");
+    logger.warn(time, query, parameters, "Slow query");
   }
-
-  // logSchemaBuild(message, queryRunner) {
-  //   logger.info(message, "Schema build");
-  // }
 
   logMigration(message, queryRunner) {
     logger.info(message, "Migration");
@@ -51,7 +45,4 @@ class PinoLogger extends AbstractLogger {
   }
 }
 
-module.exports = {
-  PinoLogger,
-  logger
-}
+export { PinoLogger, logger };

@@ -1,67 +1,77 @@
-const fastify = require('fastify');
-const fastifySwagger = require('@fastify/swagger');
-const fastifyMultipart = require('@fastify/multipart');
-const fastifySwaggerUi = require('@fastify/swagger-ui');
-const fastifyCookie = require("@fastify/cookie")
-const dotenv = require('dotenv');
+import path from "path";
+import { fileURLToPath } from "url";
 
-const swaggerUiObject = require('../Infrastructure/swaggerUiObject.js');
-const swaggerObject = require('../Infrastructure/swaggerObject.js');
-const mainRoutes = require("./routes/index.js")
-const dataSource = require("../Infrastructure/postgres.js")
-const { logger } = require("../Infrastructure/logger.js")
-dotenv.config();
+import fastifySwagger from "@fastify/swagger";
+import fastifySwaggerUi from "@fastify/swagger-ui";
+import fastifyMultipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import fastifyCookie from "@fastify/cookie";
+import socketIO from "socket.io";
+import formbody from "@fastify/formbody";
+import fastifyJwt from "@fastify/jwt";
 
-const serverInitializer = async () => {
-    const app = fastify({ logger: true });
+// Custom configs
+import swaggerUiObject from "../Infrastructure/swaggerUiObject.js";
+import swaggerObject from "../Infrastructure/swaggerObject.js";
+import { logger } from "../Infrastructure/logger.js";
 
-    //Middleware Stack
-    app.register(fastifyCookie);
-    app.register(fastifyMultipart);
-    app.register(fastifySwagger, swaggerObject.options);
-    app.register(fastifySwaggerUi, swaggerUiObject)
+// Routes
+import userRoutes from "./routes/user.route.js";
 
-    // Root Routes
-    app.get('/', async (req, res) => {
-        res.send({
-            code: 200,
-            status: 'OK',
-            message: 'Fastify server is running',
-        });
+// __dirname ka ESM version
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const serverInitializer = (fastify) => {
+  try {
+    // ✅ Register Fastify plugins
+    fastify.register(formbody); // Parse form-data
+    fastify.register(fastifyMultipart); // File uploads
+    fastify.register(fastifyCookie); // Cookie parser
+    fastify.register(fastifyJwt, {
+      secret: process.env.JWT_SECRET || "your_jwt_secret_key_here",
+    }); // JWT Auth
+    fastify.register(fastifySwagger, swaggerObject.options); // Swagger JSON
+    fastify.register(fastifySwaggerUi, swaggerUiObject); // Swagger UI
+    fastify.register(fastifyStatic, {
+      root: path.join(__dirname, "../public"), // Serve static files
     });
 
-    // Register Routes
-    mainRoutes(app)
+    // ✅ Health check route
+    fastify.get("/", async () => ({
+      code: 200,
+      status: "OK",
+      message: "Fastify server is running",
+    }));
 
-    // Database Initialization and Server Start
+    // ✅ Register all application routes
+    fastify.register(userRoutes, { prefix: "/users" });
 
-    try {
-        await dataSource
-            .initialize()
-            .then(() => {
-                logger.info('Database connection has been established...');
+    // ✅ Socket.IO setup on ready
+    fastify.ready((err) => {
+      if (err) throw err;
 
-            })
-            .catch((error) => {
-                logger.info(error)
-                logger.error('Database connection error:', {
-                    message: error.message,
-                    stack: error.stack,
-                    details: error, // Log the entire error object for additional context
-                });
+      const io = socketIO(fastify.server, {
+        cors: { origin: "*" },
+      });
 
-                process.exit(1);
-            });
+      io.on("connection", (socket) => {
+        logger.info("✅ User connected");
 
-        app.listen({
-            port: process.env.SERVER_PORT,
-            host: process.env.SERVER_HOST,
+        // Example chat event
+        socket.on("chat message", (msg) => {
+          io.emit("chat message", msg);
         });
-        logger.info(`Server is listening on port ${process.env.SERVER_PORT}`);
-    } catch (error) {
-        logger.error('Server startup error:', error);
-        process.exit(1);
-    }
+
+        socket.on("disconnect", () => {
+          logger.info("❌ User disconnected");
+        });
+      });
+    });
+  } catch (error) {
+    logger.error("❌ App initialization failed:", error);
+    process.exit(1);
+  }
 };
 
-module.exports = serverInitializer;
+export default serverInitializer;

@@ -1,0 +1,309 @@
+
+
+   <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Socket.IO Chat Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      color: #fff;
+    }
+
+    canvas#bgCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 600px;
+      height: 80vh;
+      background: rgba(0,0,0,0.7);
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      z-index: 1;
+      position: relative;
+      color: #e0f7fa;
+      font-weight: 500;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 25px;
+      color: #81d4fa;
+      text-shadow: 0 0 10px #81d4fa;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .input-group input {
+      flex: 1;
+      padding: 10px 15px;
+      border: 1px solid #81d4fa;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: rgba(0,0,0,0.5);
+      color: #e0f7fa;
+      outline: none;
+      transition: 0.3s;
+    }
+    .input-group input:focus {
+      border-color: #4fc3f7;
+      box-shadow: 0 0 8px #4fc3f7;
+      background: rgba(0,0,0,0.7);
+    }
+
+    .input-group button {
+      padding: 10px 20px;
+      background: linear-gradient(90deg,#81d4fa,#4fc3f7);
+      border: none;
+      color: #000;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.3s;
+      box-shadow: 0 0 10px #81d4fa;
+    }
+    .input-group button:hover {
+      box-shadow: 0 0 20px #4fc3f7;
+    }
+
+    /* Center Join Room button */
+    .input-group.join-room {
+      justify-content: center;
+    }
+    .input-group.join-room button {
+      width: 80%;
+      max-width: 300px;
+      padding: 15px 0;
+      font-size: 1.1rem;
+      border-radius: 12px;
+    }
+
+    #messages {
+      list-style: none;
+      flex: 1; 
+      overflow-y: auto;
+      margin-bottom: 15px;
+      padding-right: 10px;
+      padding-left: 5px;
+    }
+    #messages li {
+      padding: 10px 15px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      background: rgba(129,212,250,0.2);
+      word-wrap: break-word;
+      line-height: 1.4;
+      font-size: 0.95rem;
+      transition: 0.3s;
+      color: #e0f7fa;
+      text-shadow: 0 0 2px #81d4fa;
+    }
+    #messages li.self {
+      background: rgba(79,195,247,0.4);
+      text-align: right;
+      text-shadow: 0 0 5px #4fc3f7;
+    }
+    #messages li.joined {
+      background: rgba(132,255,150,0.3);
+      font-style: italic;
+      text-align: center;
+      color: #c8ffb3;
+      text-shadow: 0 0 4px #c8ffb3;
+    }
+
+    #messages::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-thumb { background: #4fc3f7; border-radius: 3px; }
+
+    @media (max-width: 500px) {
+      .input-group { flex-direction: column; }
+      .input-group button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+
+<div class="chat-container">
+  <h2>Socket.IO Chat Test</h2>
+
+  <div class="input-group">
+    <input id="userName" placeholder="Your name">
+    <input id="roomId" placeholder="Room ID">
+  </div>
+    <!--  Centered Join Room button -->
+   <div class="input-group join-room">
+    <button onclick="joinRoom()">Join Room</button>
+  </div>
+
+  <ul id="messages"></ul>
+
+  <div class="input-group">
+    <input id="msgInput" placeholder="Type message">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+<script>
+  // ---------- Three.js Background ----------
+  const canvas = document.getElementById('bgCanvas');
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const starCount = 2000;
+  const starPositions = [];
+  for(let i=0;i<starCount;i++){
+    starPositions.push((Math.random()-0.5)*400,(Math.random()-0.5)*200,(Math.random()-0.5)*400);
+  }
+  const stars = new THREE.BufferGeometry();
+  stars.setAttribute('position', new THREE.Float32BufferAttribute(starPositions,3));
+  const starMaterial = new THREE.PointsMaterial({ size: 0.3, color: 0xffffff });
+  const starSystem = new THREE.Points(stars, starMaterial);
+  scene.add(starSystem);
+
+  const planetTexture = new THREE.TextureLoader().load('https://threejsfundamentals.org/threejs/resources/images/planets/earth_atmos_2048.jpg');
+  const planetGeo = new THREE.SphereGeometry(8,32,32);
+  const planetMat = new THREE.MeshStandardMaterial({ map: planetTexture });
+  const planet = new THREE.Mesh(planetGeo, planetMat);
+  planet.position.set(-20,10,-50);
+  scene.add(planet);
+
+  const planet2Texture = new THREE.TextureLoader().load('https://threejsfundamentals.org/threejs/resources/images/planets/jupiter.jpg');
+  const planet2Geo = new THREE.SphereGeometry(12,32,32);
+  const planet2Mat = new THREE.MeshStandardMaterial({ map: planet2Texture });
+  const planet2 = new THREE.Mesh(planet2Geo, planet2Mat);
+  planet2.position.set(25,-10,-60);
+  scene.add(planet2);
+
+  const ambientLight = new THREE.AmbientLight(0xffffff,0.7);
+  scene.add(ambientLight);
+  const pointLight = new THREE.PointLight(0xffffff,1);
+  pointLight.position.set(50,50,50);
+  scene.add(pointLight);
+
+  camera.position.z = 50;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    starSystem.rotation.y += 0.0005;
+    starSystem.rotation.x += 0.0002;
+    planet.rotation.y += 0.001;
+    planet2.rotation.y += 0.0007;
+    renderer.render(scene,camera);
+  }
+  animate();
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- Socket.IO Chat ----------
+  const socket = io("http://127.0.0.1:3000", {
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    timeout: 20000,
+    transports: ["websocket"]
+  });
+  let currentRoom = null;
+  let userName = null;
+
+  socket.on("connect", () => {
+    console.log("Connected with socket id:", socket.id);
+  });
+
+  socket.on("disconnect", (reason) => {
+    const li = document.createElement("li");
+    li.textContent = `❌ Disconnected: ${reason}`;
+    li.classList.add("joined");
+    document.getElementById("messages").appendChild(li);
+  });
+
+  socket.on("reconnect", (attempt) => {
+    const li = document.createElement("li");
+    li.textContent = `🔌 Reconnected after ${attempt} attempts`;
+    li.classList.add("joined");
+    document.getElementById("messages").appendChild(li);
+  });
+
+  // Receive messages from the server
+  socket.on("receiveMessage", (data) => {
+    const li = document.createElement("li");
+    li.textContent = `[${data.time}] ${data.sender}: ${data.message}`;
+    
+    if (data.sender === "System") {
+      li.classList.add("joined");
+    } else if (data.sender === userName) {
+      li.classList.add("self");
+    }
+
+    document.getElementById("messages").appendChild(li);
+    li.scrollIntoView({ behavior: "smooth" });
+  });
+
+  // Join a chat room
+  function joinRoom() {
+    userName = document.getElementById("userName").value.trim();
+    currentRoom = document.getElementById("roomId").value.trim();
+
+    if (!userName || !currentRoom) {
+      return alert("⚠ Please enter both username and room ID.");
+    }
+
+    // Emit joinRoom event
+    socket.emit("joinRoom", { userName, roomId: currentRoom });
+
+    // Local message confirmation
+    const li = document.createElement("li");
+    li.textContent = `✅ You joined room: ${currentRoom}`;
+    li.classList.add("joined");
+    document.getElementById("messages").appendChild(li);
+  }
+
+  // Send message to the room
+  function sendMessage() {
+    const msg = document.getElementById("msgInput").value.trim();
+
+    if (!msg) return;
+    if (!currentRoom || !userName) {
+      return alert("⚠ Please join a room first.");
+    }
+
+    socket.emit("sendMessage", msg); // Backend will know roomId & userName from socket.data
+
+    document.getElementById("msgInput").value = "";
+  }
+</script>
+
+</body>
+</html> 

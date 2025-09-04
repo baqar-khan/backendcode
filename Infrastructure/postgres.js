@@ -1,23 +1,15 @@
-const { DataSource } = require('typeorm');
-const path = require('path');
-const { configDotenv } = require('dotenv');
-configDotenv();
-const { PinoLogger, logger } = require('./logger.js');
+import { DataSource } from "typeorm";
+import UserEntity from "../src/entities/User.js";
 
-
-const dataSource = new DataSource({
-    type: process.env.DB_DIALECT,
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    username: process.env.DB_USERNAME,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DATABASE,
-    synchronize: true,
-    logging: true,
-    logger: new PinoLogger,
-    entities: [path.join(__dirname, '../src/entities/**/*.js')],
-    // migrations: [ "src/migration/**/*.js" ],
-    // subscribers: [ "src/subscriber/**/*.js" ]
-})
-
-module.exports = dataSource;
+export const AppDataSource = new DataSource({
+  type: "postgres",
+  host: "localhost",
+  port: 5435,
+  username: "docker",
+  password: "docker",
+  database: "postgres",
+  synchronize: true, // dev ke liye
+  logging: true,
+  entities: [UserEntity], // Yaha register kiya
+});
+export default AppDataSource;
