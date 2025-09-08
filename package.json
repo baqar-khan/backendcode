@@ -1,12 +1,15 @@
+
+
 {
   "name": "fastify-boilerplate",
   "version": "1.0.0",
-  "description": "This is fastify boilerplate ",
+  "description": "This is fastify boilerplate",
   "type": "module",
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "echo \"No build step needed for JavaScript project\""
   },
   "author": "Hammad Afzal",
   "license": "ISC",
